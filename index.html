@@ -1,0 +1,713 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NeuroHertz — Gamma instability as an EEG biomarker</title>
+<meta name="description" content="NeuroHertz measures how much the brain's 40 Hz gamma rhythm wanders. Nineteen dry electrodes, ten minutes eyes-closed, one interpretable number — 73.8% held-out accuracy separating Alzheimer's disease from healthy controls on OpenNeuro ds004504.">
+<meta name="theme-color" content="#07070d">
+<meta name="color-scheme" content="dark light">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="NeuroHertz">
+<meta property="og:title" content="NeuroHertz — The brain keeps time at 40 Hz">
+<meta property="og:description" content="One EEG number for how much the gamma rhythm wanders. 19 channels, 10 minutes, every step inspectable.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<script>
+  /* Resolve the theme before first paint so the page never flashes the wrong palette. */
+  (function () {
+    try {
+      var t = localStorage.getItem('nh-theme');
+      if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "NeuroHertz",
+  "description": "A 19-channel EEG headset and signal pipeline that measures gamma-frequency instability as a biomarker for Alzheimer's disease.",
+  "founder": { "@type": "Person", "name": "Wordson Robert" },
+  "location": "IISER Kolkata, India"
+}
+</script>
+</head>
+<body class="no-js">
+<script>document.body.classList.remove('no-js'); document.body.classList.add('is-booting');</script>
+<a class="skip" href="#main">Skip to main content</a>
+
+<!-- ── Boot: the electrode check ──────────────────────────────────────────── -->
+<div class="boot" id="boot" role="status" aria-live="polite">
+  <div class="boot__inner">
+    <div class="brand brand--boot"><span class="brand__mark" aria-hidden="true"><svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="12.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4.5 16h4l2.2-5.5 3 11 2.6-14 2.6 14 3-11L24.1 16h3.4" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg></span><span class="brand__word">Neuro<b>Hertz</b></span></div>
+    <div class="boot__grid">
+      <svg class="boot__map" id="boot-map" viewBox="-1.1 -1.15 2.2 2.3" aria-hidden="true"></svg>
+      <div class="boot__readout">
+        <p class="boot__count"><span id="boot-count">00</span><small>/19</small> <span>Seating electrodes</span></p>
+        <div class="boot__bar"><span id="boot-fill"></span></div>
+        <p class="boot__task"><span id="boot-task">Impedance check</span><span id="boot-pct">0%</span></p>
+        <ol class="boot__log" id="boot-log"></ol>
+      </div>
+    </div>
+  </div>
+</div>
+
+<canvas class="gl" id="gl" aria-hidden="true"></canvas>
+<div class="labels" id="labels" aria-hidden="true"></div>
+<div class="progress" aria-hidden="true"><span id="progress"></span></div>
+
+<!-- ── Header ─────────────────────────────────────────────────────────────── -->
+<header class="nav" id="nav">
+  <a class="brand" href="#top" aria-label="NeuroHertz — back to top">
+    <span class="brand__mark" aria-hidden="true"><svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="12.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4.5 16h4l2.2-5.5 3 11 2.6-14 2.6 14 3-11L24.1 16h3.4" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg></span>
+    <span class="brand__word">Neuro<b>Hertz</b></span>
+  </a>
+  <nav class="nav__links" aria-label="Chapters">
+    <a href="#signal" data-nav="signal">Signal</a>
+    <a href="#clean" data-nav="clean">Clean</a>
+    <a href="#decompose" data-nav="decompose">Decompose</a>
+    <a href="#rhythm" data-nav="rhythm">Rhythm</a>
+    <a href="#biomarker" data-nav="biomarker">Biomarker</a>
+    <a href="#headset" data-nav="headset">Headset</a>
+    <a href="#results" data-nav="results">Results</a>
+    <a href="#lab" data-nav="lab">Lab</a>
+    <a href="#team" data-nav="team">Team</a>
+  </nav>
+  <div class="nav__actions">
+    <button class="icon-btn" id="theme-toggle" type="button" aria-label="Switch to light theme">
+      <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+      <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+    </button>
+    <a class="btn btn--primary btn--sm nav__cta" href="#contact">Request a pilot</a>
+    <button class="icon-btn nav__menu" id="menu-toggle" type="button" aria-expanded="false" aria-controls="menu" aria-label="Open chapter menu">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+</header>
+<div class="menu" id="menu" hidden>
+  <nav aria-label="All chapters">
+    <a href="#signal"><span>01</span>The signal</a>
+    <a href="#clean"><span>02</span>Clean</a>
+    <a href="#decompose"><span>03</span>Decompose</a>
+    <a href="#rhythm"><span>04</span>Rhythm</a>
+    <a href="#biomarker"><span>05</span>The biomarker</a>
+    <a href="#headset"><span>06</span>The headset</a>
+    <a href="#tuning"><span>07</span>Tuning</a>
+    <a href="#results"><span>08</span>Results</a>
+    <a href="#lab"><span>09</span>The lab</a>
+    <a href="#platform"><span>10</span>Platform</a>
+    <a href="#uses"><span>11</span>Where it fits</a>
+    <a href="#evidence"><span>12</span>Evidence</a>
+    <a href="#team"><span>13</span>Team</a>
+    <a href="#contact" class="menu__cta"><span>→</span>Request a pilot</a>
+  </nav>
+</div>
+
+<main id="main">
+
+<!-- ── Hero ───────────────────────────────────────────────────────────────── -->
+<section class="hero" id="top">
+  <div class="hero__copy">
+    <p class="eyebrow"><span class="pulse-dot" aria-hidden="true"></span>EEG biomarker · 19 channels · 10 minutes</p>
+    <h1 class="hero__title">The brain keeps time<br>at <span class="hz">40&nbsp;Hz</span>.</h1>
+    <p class="hero__lede">In Alzheimer's disease, that beat starts to <button class="wander" id="wander" type="button" aria-pressed="false" title="Show a wandering rhythm">wander</button>. NeuroHertz seats nineteen dry electrodes on the scalp, records ten minutes with the eyes closed, and measures exactly how much it wanders.</p>
+    <div class="cta-row">
+      <a class="btn btn--primary" href="#signal">Follow one wave <span aria-hidden="true">→</span></a>
+      <a class="btn btn--ghost" href="#headset">Meet the headset</a>
+    </div>
+    <dl class="hero__stats">
+      <div><dt>Features</dt><dd>1</dd></div>
+      <div><dt>Held-out accuracy</dt><dd>73.8<small>%</small></dd></div>
+      <div><dt>AUC</dt><dd>0.781</dd></div>
+      <div><dt>Recording</dt><dd>10<small> min</small></dd></div>
+    </dl>
+    <p class="hero__fine">Alzheimer's vs. healthy controls · 65 subjects · leave-one-subject-out · OpenNeuro ds004504</p>
+  </div>
+  <a class="scroll-cue" href="#signal" aria-label="Scroll to the first chapter"><span>Begin recording</span><i aria-hidden="true"></i></a>
+</section>
+
+<!-- ── Chapters 01–05: one wave, scalp to number ──────────────────────────── -->
+<section class="film" id="film" aria-label="Follow one wave from scalp to number">
+  <div class="film__stage" aria-hidden="true">
+    <div class="film__frame">
+      <canvas class="film__scope" id="scope"></canvas>
+      <div class="film__top">
+        <span class="chip chip--rec"><i></i>REC</span>
+        <span class="chip" id="film-beat">RAW · 19 CHANNELS</span>
+      </div>
+      <svg class="film__map" id="film-map" viewBox="-1.1 -1.15 2.2 2.3"></svg>
+      <p class="film__note" id="film-note">Synthetic recording · measured live in your browser</p>
+    </div>
+    <div class="hud" id="hud">
+      <span>CH <b id="hud-ch">19</b></span>
+      <span>FS <b>500</b> HZ</span>
+      <span>T <b id="hud-t">00:00.0</b></span>
+      <span>REF <b>AVG</b></span>
+      <span class="hud__opt">γ <b id="hud-g">—</b></span>
+      <span>σ<sub>f</sub> <b id="hud-s">—</b></span>
+    </div>
+  </div>
+
+  <div class="film__steps">
+    <article class="step" id="signal" data-step="0">
+      <div class="panel step__card">
+        <p class="chapter-tag">01 · The signal</p>
+        <h2>Nineteen waves, <em>five hundred times a second</em></h2>
+        <div class="step__body">
+          <p>Every electrode reports a voltage every two milliseconds. Ten minutes of eyes-closed rest becomes a matrix: one row per electrode, one column per instant.</p>
+          <p class="formula" aria-label="X is a real matrix with 19 rows and N columns, N equals 600 seconds times 500 hertz, 300,000">
+            <span><var>X</var> ∈ ℝ<sup>19 × <var>N</var></sup></span>
+            <span><var>N</var> = 600 s × 500 Hz = 300,000</span>
+          </p>
+          <dl class="kv">
+            <div><dt>Rows</dt><dd>19 electrodes</dd></div>
+            <div><dt>Columns</dt><dd>300,000 instants</dd></div>
+            <div><dt>Per recording</dt><dd>5.7 M numbers</dd></div>
+          </dl>
+          <p class="aside">Each electrode hears a weighted mix of sources through skull and scalp. P3 is a place on the head, not a node in the brain.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="clean" data-step="1">
+      <div class="panel step__card">
+        <p class="chapter-tag">02 · Clean</p>
+        <h2>Take out everything <em>that isn't brain</em></h2>
+        <div class="step__body">
+          <p>Mains hum, slow drift, blinks and electrode pops ride on top of the signal. Each of the 19 rows is cleaned on its own.</p>
+          <ul class="ticks">
+            <li><b>Band-pass 0.5–80 Hz</b> — wide enough to keep the whole gamma band. The dataset's published derivatives stop at 45 Hz, so we start from raw.</li>
+            <li><b>Notch at 50 Hz</b> for mains hum.</li>
+            <li><b>Average reference</b> — subtract the 19-electrode mean at every instant, so each column sums to zero.</li>
+            <li><b>Spike repair</b> — flag samples beyond five robust deviations and redraw them from their neighbours.</li>
+          </ul>
+          <details class="worked">
+            <summary>How the spike rule decides</summary>
+            <div class="worked__body">
+              <p class="mono">x = [2, 3, 4, 3, 2, <mark>50</mark>, 3, 2, 1, 3]</p>
+              <ol>
+                <li>median = 3, so |x − 3| = [1, 0, 1, 0, 1, 47, 0, 1, 2, 0]</li>
+                <li>MAD = median of that = <b>1</b>. The 47 barely moves it.</li>
+                <li>σ̂ = MAD / 0.6745 ≈ <b>1.48</b>, a standard deviation the spike can't inflate</li>
+                <li>threshold = 5σ̂ ≈ <b>7.41</b>, and |50| &gt; 7.41, so it's flagged</li>
+                <li>±10 samples (±20 ms) around it are redrawn by linear interpolation</li>
+              </ol>
+              <p class="aside">N samples in, N samples out. The recording is repaired, never shortened.</p>
+            </div>
+          </details>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="decompose" data-step="2">
+      <div class="panel step__card">
+        <p class="chapter-tag">03 · Decompose</p>
+        <h2>One wave <em>becomes eight</em></h2>
+        <div class="step__body">
+          <p>Variational Mode Decomposition splits one electrode's wave into <b>K = 8</b> narrow-band waves that add back up to the original. Each carries a centre frequency ω. We keep the mode nearest <b>40 Hz</b> and set the other seven aside.</p>
+          <p class="formula"><span><var>x</var>(<var>t</var>) ≈ <var>u</var><sub>1</sub>(<var>t</var>) + <var>u</var><sub>2</sub>(<var>t</var>) + … + <var>u</var><sub>8</sub>(<var>t</var>)</span></p>
+          <p class="omega" id="omega-readout" aria-live="off">ω on this recording: <span>computing…</span></p>
+          <p class="aside">Read at <b>P3</b>, over the left parietal scalp — the channel used for 82 of 88 recordings.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="rhythm" data-step="3">
+      <div class="panel step__card">
+        <p class="chapter-tag">04 · Rhythm</p>
+        <h2>Ask the gamma wave <em>what time it is</em></h2>
+        <div class="step__body">
+          <p>The Hilbert transform turns the gamma wave into a rotating phasor with an amplitude <var>A</var>(<var>t</var>) and a phase φ(<var>t</var>). How fast the phase turns is the instantaneous frequency: a fresh reading every 2 ms, not one number for ten minutes.</p>
+          <p class="formula">
+            <span><var>z</var>(<var>t</var>) = <var>A</var>(<var>t</var>) · e<sup><var>i</var>φ(<var>t</var>)</sup></span>
+            <span><var>f</var>(<var>t</var>) = Δφ ⁄ 2π × 500 Hz</span>
+          </p>
+          <dl class="kv">
+            <div><dt>Envelope</dt><dd>how strong gamma is</dd></div>
+            <div><dt>Phase</dt><dd>where in its cycle it is</dd></div>
+            <div><dt>Frequency</dt><dd>how fast it's cycling, now</dd></div>
+          </dl>
+        </div>
+      </div>
+    </article>
+
+    <article class="step" id="biomarker" data-step="4">
+      <div class="panel step__card">
+        <p class="chapter-tag">05 · The biomarker</p>
+        <h2>One number: <em>how much the beat wanders</em></h2>
+        <div class="step__body">
+          <p>Keep the readings between 25 and 80 Hz and take their standard deviation. A steady rhythm scores low and a wandering one scores high. That one number, <b class="mono">std_ifreq</b>, is the entire biomarker.</p>
+          <div class="groups">
+            <div class="group group--cn"><span>Healthy controls · n = 29</span><b>5.53 <small>± 1.09 Hz</small></b></div>
+            <div class="group group--ad"><span>Alzheimer's · n = 36</span><b>7.17 <small>± 1.89 Hz</small></b></div>
+          </div>
+          <p class="aside">Mann–Whitney p &lt; 0.0001. Within the Alzheimer's group, higher instability goes with lower MMSE (Spearman r = −0.43, p = 0.009). On screen are two synthetic 4-second recordings measured live; clinical values come from ten-minute recordings and run higher.</p>
+        </div>
+      </div>
+    </article>
+  </div>
+</section>
+
+<!-- ── 06 · The headset ───────────────────────────────────────────────────── -->
+<section class="headset" id="headset" aria-label="The NeuroHertz headset">
+  <div class="headset__steps">
+    <article class="hstep" data-hstep="0">
+      <div class="panel hstep__card">
+        <p class="chapter-tag">06 · The headset</p>
+        <h2>And this is <em>what was listening</em></h2>
+        <p>Nineteen dry electrodes in the clinical 10–20 layout, the same montage the pipeline was validated on, wired into three ADC zones and one pod at the back of the head. No gel and no scanner: ten minutes in a chair.</p>
+        <dl class="spec">
+          <div><dt>Channels</dt><dd>19</dd></div>
+          <div><dt>Layout</dt><dd>10–20 system</dd></div>
+          <div><dt>Contacts</dt><dd>Dry electrodes</dd></div>
+          <div><dt>Session</dt><dd>10 min, eyes closed</dd></div>
+          <div><dt>Pipeline rate</dt><dd>500 Hz</dd></div>
+        </dl>
+      </div>
+    </article>
+    <article class="hstep" data-hstep="1">
+      <div class="panel hstep__card">
+        <p class="chapter-tag">Three ADC zones</p>
+        <h3>Left, right and midline, each on its own converter</h3>
+        <ul class="legend-list">
+          <li><i style="--c: var(--zone-l)"></i><b>ADC-L</b> Fp1 · F7 · F3 · T3 · C3 · T5 · P3 · O1</li>
+          <li><i style="--c: var(--zone-r)"></i><b>ADC-R</b> Fp2 · F8 · F4 · T4 · C4 · T6 · P4 · O2</li>
+          <li><i style="--c: var(--zone-m)"></i><b>ADC-M</b> Fz · Cz · Pz and the main pod</li>
+        </ul>
+        <p>Serpentine links run between neighbouring electrodes. The zig-zag gives every contact room to settle against the scalp.</p>
+      </div>
+    </article>
+    <article class="hstep" data-hstep="2">
+      <div class="panel hstep__card">
+        <p class="chapter-tag">The pod</p>
+        <h3>Conversion, control and audio at the back of the head</h3>
+        <p>The main pod carries the midline converter, the microcontroller and the audio driver. Acoustic tubes run from it to both ears, and the left and right hubs report to it over a shared bus.</p>
+        <ul class="legend-list">
+          <li><i style="--c: var(--zone-bus)"></i><b>SPI bus</b> hub-to-pod data</li>
+          <li><i style="--c: var(--zone-tube)"></i><b>Acoustic tubes</b> pod to both ears</li>
+          <li><i style="--c: var(--zone-mech)"></i><b>Mechanical links</b> structure only</li>
+        </ul>
+      </div>
+    </article>
+    <article class="hstep" data-hstep="3">
+      <div class="panel hstep__card">
+        <p class="chapter-tag">The montage</p>
+        <h3>Odd numbers left, even numbers right, z on the midline</h3>
+        <svg class="montage" id="montage-map" viewBox="-1.1 -1.15 2.2 2.3" role="img" aria-label="Top view of the 19-electrode 10–20 montage"></svg>
+        <p class="aside" id="montage-hint">Hover or tap an electrode to see the region it sits over.</p>
+      </div>
+    </article>
+  </div>
+</section>
+
+<!-- ── 07 · Tuning ────────────────────────────────────────────────────────── -->
+<section class="chapter" id="tuning">
+  <div class="wrap">
+    <header class="chapter__head">
+      <p class="chapter-tag">07 · Tuned per recording</p>
+      <h2>Every recording gets <em>its own decomposition</em></h2>
+      <p class="lede">One setting of K and α doesn't fit every head. For each recording we run 16 decompositions on the parietal channel and a judge picks one: a variational autoencoder trained on 1.39 million half-second gamma segments from healthy controls. The decomposition whose gamma it reconstructs best is kept.</p>
+    </header>
+
+    <div class="tuning">
+      <figure class="panel sweep">
+        <figcaption class="sweep__cap"><span>The search space · 4 × 4</span><span class="mono" id="sweep-status">decomposing…</span></figcaption>
+        <div class="sweep__grid" id="sweep-grid" role="table" aria-label="Gamma mode for each K and alpha on the steady synthetic recording">
+          <div class="sweep__corner" role="columnheader">K ╲ α</div>
+        </div>
+        <p class="aside">Gamma mode for each setting on the steady synthetic recording, decomposed live. Each cell's label is the centre frequency of the mode nearest 40 Hz.</p>
+      </figure>
+
+      <div class="tuning__side">
+        <figure class="panel vae">
+          <figcaption class="vae__cap">The judge · β-VAE</figcaption>
+          <svg class="vae__net" viewBox="0 0 320 120" role="img" aria-label="Encoder 256 to 128 to 128 to latent 16, decoder 16 to 128 to 128 to 256">
+            <g class="vae__layers"></g>
+          </svg>
+          <dl class="kv kv--tight">
+            <div><dt>Segment</dt><dd>256 samples · 0.512 s · 50% overlap</dd></div>
+            <div><dt>Training set</dt><dd>1,386,856 segments · 29 controls × 15 channels</dd></div>
+            <div><dt>Loss</dt><dd>MSE + 0.01 · KL · 200 epochs</dd></div>
+            <div><dt>Score</dt><dd>−MSE · less negative = more healthy-like</dd></div>
+          </dl>
+        </figure>
+
+        <figure class="panel dist">
+          <figcaption>What the judge chose, across 88 recordings</figcaption>
+          <div class="bars" id="dist-k" data-title="Best K"></div>
+          <div class="bars" id="dist-a" data-title="Best α"></div>
+          <p class="aside">P3 was the decomposed channel for 82 recordings; Pz and P4 stood in for 3 each.</p>
+        </figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 08 · Results ───────────────────────────────────────────────────────── -->
+<section class="chapter" id="results">
+  <div class="wrap">
+    <header class="chapter__head">
+      <p class="chapter-tag">08 · Results</p>
+      <h2>Sixty-five people <em>it had never seen</em></h2>
+      <p class="lede">Leave one subject out, train on the other 64, predict the one left out, and repeat 65 times. Every prediction below was made about someone the model was not trained on.</p>
+    </header>
+
+    <div class="results">
+      <div class="panel results__hero">
+        <p class="figure-label">Held-out accuracy</p>
+        <p class="hero-figure">73.8<small>%</small></p>
+        <p class="aside">48 of 65 classified correctly · balanced accuracy 74.0%</p>
+        <dl class="tiles">
+          <div><dt>AUC</dt><dd>0.781</dd><span>95% CI 0.656–0.886</span></div>
+          <div><dt>Sensitivity</dt><dd>72.2%</dd><span>26 of 36 Alzheimer's</span></div>
+          <div><dt>Specificity</dt><dd>75.9%</dd><span>22 of 29 controls</span></div>
+        </dl>
+      </div>
+
+      <figure class="panel units">
+        <figcaption>
+          <span>Every subject, as the model saw them</span>
+          <span class="legend">
+            <span><i class="sw sw--ad"></i>Alzheimer's</span>
+            <span><i class="sw sw--cn"></i>Control</span>
+            <span><i class="sw sw--miss"></i>Misclassified</span>
+          </span>
+        </figcaption>
+        <div class="units__groups" id="units"></div>
+        <table class="matrix">
+          <caption class="sr">Confusion matrix</caption>
+          <thead><tr><th scope="col"></th><th scope="col">Predicted control</th><th scope="col">Predicted Alzheimer's</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Control</th><td>22</td><td>7</td></tr>
+            <tr><th scope="row">Alzheimer's</th><td>10</td><td>26</td></tr>
+          </tbody>
+        </table>
+      </figure>
+
+      <figure class="panel whisker">
+        <figcaption>std_ifreq by group · mean ± SD</figcaption>
+        <div class="whisker__plot" id="whisker"></div>
+        <p class="aside">Mann–Whitney p &lt; 0.0001. Amplitude variability (cv_envelope) was also tested and ran the other way (p = 0.037, Alzheimer's lower), so it was left out.</p>
+      </figure>
+
+      <figure class="panel checks">
+        <figcaption>Did it learn the signal, or the setup?</figcaption>
+        <table class="table">
+          <thead><tr><th scope="col">Check</th><th scope="col">Result</th><th scope="col">Reads as</th></tr></thead>
+          <tbody>
+            <tr><td>5-fold cross-validation</td><td class="num">73.8%</td><td>Same answer under a different split</td></tr>
+            <tr><td>10-fold cross-validation</td><td class="num">73.8%</td><td>Same answer under a different split</td></tr>
+            <tr><td>Majority-class baseline</td><td class="num">55.4%</td><td>Not an artefact of 36 vs 29</td></tr>
+            <tr><td>Shuffled labels</td><td class="num">49.2%</td><td>Chance when the labels mean nothing</td></tr>
+            <tr><td>Train − test gap</td><td class="num">0.3 pts</td><td>One feature has little to overfit</td></tr>
+          </tbody>
+        </table>
+      </figure>
+    </div>
+
+    <div class="bench" id="benchmark">
+      <header class="bench__head">
+        <p class="chapter-tag">Glass box vs black box</p>
+        <h3>3.2 points behind a 95-feature model, <em>with one number a clinician can read</em></h3>
+      </header>
+      <figure class="panel bench__chart">
+        <figcaption class="sr">Accuracy on OpenNeuro ds004504, Alzheimer's vs controls</figcaption>
+        <div class="hbars" id="bench-bars"></div>
+        <p class="aside">The 83.1% result used 5-fold group cross-validation rather than leave-one-subject-out, so it isn't a like-for-like comparison. Other published results on this dataset run higher still, often from per-epoch rather than per-subject evaluation.</p>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ── 09 · The lab ───────────────────────────────────────────────────────── -->
+<section class="chapter" id="lab">
+  <div class="wrap">
+    <header class="chapter__head">
+      <p class="chapter-tag">09 · The lab</p>
+      <h2>Every phase is a dial. <em>Turn one.</em></h2>
+      <p class="lede">This is the pipeline re-implemented in your browser and checked against the Python originals to within 10<sup>−13</sup>: the same band-pass, spike repair, VMD and Hilbert steps. It runs on two synthetic recordings. Change a parameter and every phase downstream recomputes.</p>
+    </header>
+
+    <div class="lab" id="lab-app">
+      <div class="lab__bar">
+        <span class="lab__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="lab__title mono">NEUROHERTZ LAB — synthetic · P3 · 4.1 s</span>
+        <span class="lab__state mono" id="lab-state" aria-live="polite">ready</span>
+      </div>
+      <div class="lab__tabs" role="tablist" aria-label="Pipeline phase">
+        <button role="tab" aria-selected="true" data-tab="clean" id="tab-clean">1 · Clean</button>
+        <button role="tab" aria-selected="false" data-tab="decompose" id="tab-decompose">2 · Decompose</button>
+        <button role="tab" aria-selected="false" data-tab="rhythm" id="tab-rhythm">3 · Rhythm</button>
+        <button role="tab" aria-selected="false" data-tab="score" id="tab-score">4 · Score</button>
+        <div class="seg" role="radiogroup" aria-label="Synthetic subject">
+          <button role="radio" aria-checked="true" data-subject="steady">Steady</button>
+          <button role="radio" aria-checked="false" data-subject="wandering">Wandering</button>
+        </div>
+      </div>
+      <div class="lab__body">
+        <div class="lab__view" role="tabpanel" id="lab-view" aria-labelledby="tab-clean">
+          <canvas id="lab-canvas"></canvas>
+          <p class="lab__caption" id="lab-caption"></p>
+        </div>
+        <aside class="lab__inspector" aria-label="Pipeline parameters">
+          <fieldset>
+            <legend>Phase 1 · Clean</legend>
+            <label class="ctl"><span>Band-pass low <output data-for="lo">0.5 Hz</output></span><input type="range" name="lo" min="0.1" max="4" step="0.1" value="0.5"></label>
+            <label class="ctl"><span>Band-pass high <output data-for="hi">80 Hz</output></span><input type="range" name="hi" min="45" max="120" step="1" value="80"></label>
+            <label class="ctl ctl--check"><input type="checkbox" name="notch" checked><span>50 Hz notch</span></label>
+            <label class="ctl"><span>Spike threshold <output data-for="threshold">5.0 σ̂</output></span><input type="range" name="threshold" min="2" max="10" step="0.5" value="5"></label>
+            <label class="ctl"><span>Repair margin <output data-for="margin">±10 samples</output></span><input type="range" name="margin" min="0" max="30" step="1" value="10"></label>
+          </fieldset>
+          <fieldset>
+            <legend>Phase 2 · Decompose</legend>
+            <label class="ctl"><span>Modes K <output data-for="K">8</output></span><input type="range" name="K" min="3" max="12" step="1" value="8"></label>
+            <label class="ctl"><span>Bandwidth α <output data-for="alpha">2000</output></span><input type="range" name="alpha" min="250" max="8000" step="250" value="2000"></label>
+            <label class="ctl"><span>Target <output data-for="target">40 Hz</output></span><input type="range" name="target" min="30" max="60" step="1" value="40"></label>
+          </fieldset>
+          <fieldset>
+            <legend>Phase 4 · Score</legend>
+            <label class="ctl"><span>Valid band low <output data-for="validLo">25 Hz</output></span><input type="range" name="validLo" min="10" max="35" step="1" value="25"></label>
+            <label class="ctl"><span>Valid band high <output data-for="validHi">80 Hz</output></span><input type="range" name="validHi" min="50" max="120" step="1" value="80"></label>
+          </fieldset>
+          <button class="btn btn--ghost btn--sm" type="button" id="lab-reset">Reset to pipeline defaults</button>
+        </aside>
+      </div>
+      <div class="lab__foot">
+        <dl class="lab__readout">
+          <div class="r r--cn"><dt>Steady · std_ifreq</dt><dd id="r-steady">—</dd></div>
+          <div class="r r--ad"><dt>Wandering · std_ifreq</dt><dd id="r-wandering">—</dd></div>
+          <div class="r"><dt>Separation</dt><dd id="r-gap">—</dd></div>
+        </dl>
+        <pre class="lab__code mono" id="lab-code" aria-label="Pipeline constants as currently set"></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 10 · Platform ──────────────────────────────────────────────────────── -->
+<section class="chapter" id="platform">
+  <div class="wrap">
+    <header class="chapter__head">
+      <p class="chapter-tag">10 · Platform</p>
+      <h2>Four phases, <em>one contract</em></h2>
+      <p class="lede">Each phase reads files, writes files, and checkpoints after every subject. Swap a filter, a decomposition or a classifier and nothing else has to change. Stop any phase halfway and it resumes where it left off.</p>
+    </header>
+
+    <ol class="flow" aria-label="Pipeline order">
+      <li>Raw EEG</li><li>Clean</li><li>Decompose</li><li>Tune</li><li>Decide</li><li>One number</li>
+    </ol>
+
+    <div class="phases">
+      <article class="panel phase">
+        <p class="phase__n">Phase 01</p>
+        <h3>Clean</h3>
+        <p>Band-pass, notch, average reference and MAD spike repair, applied to every electrode independently.</p>
+        <dl class="io">
+          <div><dt>In</dt><dd>EEGLAB .set · 19 × N</dd></div>
+          <div><dt>Out</dt><dd>sub-XXX_clean.npy · float32</dd></div>
+        </dl>
+        <pre class="consts mono">l_freq        = 0.5
+h_freq        = 80.0
+notch         = 50.0
+threshold_std = 5.0
+interp_margin = 10</pre>
+        <p class="swap"><b>Swap in</b> a 60 Hz notch, ICA, a different reference</p>
+      </article>
+      <article class="panel phase">
+        <p class="phase__n">Phase 02</p>
+        <h3>Decompose</h3>
+        <p>VMD on each channel; keep the mode nearest 40 Hz, then its Hilbert envelope and instantaneous frequency.</p>
+        <dl class="io">
+          <div><dt>In</dt><dd>clean .npy</dd></div>
+          <div><dt>Out</dt><dd>gamma · envelope · inst_freq · ω</dd></div>
+        </dl>
+        <pre class="consts mono">VMD_K     = 8
+VMD_ALPHA = 2000
+VMD_TAU   = 0
+VMD_TOL   = 1e-7
+TARGET_HZ = 40.0</pre>
+        <p class="swap"><b>Swap in</b> EMD, wavelets, a fixed band-pass</p>
+      </article>
+      <article class="panel phase">
+        <p class="phase__n">Phase 03</p>
+        <h3>Tune</h3>
+        <p>Train the VAE judge, sweep 16 VMD settings per recording, and re-extract the parietal gamma with the winner.</p>
+        <dl class="io">
+          <div><dt>In</dt><dd>gamma segments · clean P3</dd></div>
+          <div><dt>Out</dt><dd>best K, α · final ifreq</dd></div>
+        </dl>
+        <pre class="consts mono">SEGMENT_LEN  = 256
+LATENT_DIM   = 16
+K_VALUES     = [6, 7, 8, 9]
+ALPHA_VALUES = [1000 … 4000]</pre>
+        <p class="swap"><b>Swap in</b> another judge, a wider grid, another channel</p>
+      </article>
+      <article class="panel phase">
+        <p class="phase__n">Phase 04</p>
+        <h3>Decide</h3>
+        <p>Reduce each recording to std_ifreq, log-transform and standardise it, and classify with leave-one-subject-out validation.</p>
+        <dl class="io">
+          <div><dt>In</dt><dd>ifreq · sweep log · participants</dd></div>
+          <div><dt>Out</dt><dd>results JSON · predictions</dd></div>
+        </dl>
+        <pre class="consts mono">valid   = 25 &lt; f &lt; 80
+feature = log1p(std_ifreq)
+model   = LogisticRegression(
+            class_weight='balanced')
+cv      = leave-one-subject-out</pre>
+        <p class="swap"><b>Swap in</b> any scikit-learn classifier, more features</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ── 11 · Where it fits ─────────────────────────────────────────────────── -->
+<section class="chapter" id="uses">
+  <div class="wrap">
+    <header class="chapter__head">
+      <p class="chapter-tag">11 · Where it fits</p>
+      <h2>Ten minutes, a chair <em>and a headset</em></h2>
+      <p class="lede">EEG is cheap, quiet and already in most hospitals. A dry headset and a single readable number take it out of the specialist lab.</p>
+    </header>
+    <div class="uses">
+      <article class="panel use">
+        <span class="use__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 20V9l8-5 8 5v11M9 20v-6h6v6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
+        <h3>Memory clinics</h3>
+        <p>An objective physiological measure to sit beside cognitive testing, recorded in the same visit.</p>
+      </article>
+      <article class="panel use">
+        <span class="use__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+        <h3>Primary &amp; community care</h3>
+        <p>No scanner, no gel, no specialist on site. Built toward deciding who should be referred, and sooner.</p>
+      </article>
+      <article class="panel use">
+        <span class="use__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 18l5-6 4 3 7-9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 21h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+        <h3>Trials &amp; cohorts</h3>
+        <p>One interpretable number to track across visits, with every processing step logged and reproducible.</p>
+      </article>
+      <article class="panel use">
+        <span class="use__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 7l-4 5 4 5M16 7l4 5-4 5M13.5 5l-3 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <h3>Open research</h3>
+        <p>Trained and tested on open data, with code that runs end to end. Anyone can check the number.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ── 12 · Evidence ──────────────────────────────────────────────────────── -->
+<section class="chapter" id="evidence">
+  <div class="wrap">
+    <header class="chapter__head">
+      <p class="chapter-tag">12 · Evidence</p>
+      <h2>What the numbers say, <em>and what they don't</em></h2>
+    </header>
+    <div class="claims">
+      <article class="panel claim claim--is">
+        <h3><span aria-hidden="true">✓</span> What we claim</h3>
+        <ul>
+          <li>std_ifreq at P3 separates Alzheimer's from controls on ds004504 (p &lt; 0.0001).</li>
+          <li>Within Alzheimer's, it tracks cognitive severity (MMSE r = −0.43, p = 0.009).</li>
+          <li>It holds up on held-out subjects: 73.8% accuracy, AUC 0.781 under leave-one-subject-out.</li>
+          <li>It does this with one feature where comparable models use 95.</li>
+        </ul>
+      </article>
+      <article class="panel claim claim--not">
+        <h3><span aria-hidden="true">✕</span> What we don't, yet</h3>
+        <ul>
+          <li>Early detection. These patients were already diagnosed; the dataset has no prodromal or MCI group.</li>
+          <li>Generalisation. This is one dataset, one site and 65 subjects, not yet tested on an independent cohort.</li>
+          <li>State-of-the-art accuracy. Multi-feature models score higher.</li>
+          <li>Clinical readiness. NeuroHertz is a research prototype, not a medical device.</li>
+        </ul>
+      </article>
+      <article class="panel claim claim--next">
+        <h3><span aria-hidden="true">→</span> What comes next</h3>
+        <ol>
+          <li>Independent cohorts, other sites and other amplifiers</li>
+          <li>MCI and early-stage participants, which is where early detection has to be earned</li>
+          <li>Recordings on the NeuroHertz headset itself</li>
+          <li>Nested validation and full permutation testing as the cohort grows</li>
+        </ol>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ── 13 · Team ──────────────────────────────────────────────────────────── -->
+<section class="chapter" id="team">
+  <div class="wrap">
+    <header class="chapter__head">
+      <p class="chapter-tag">13 · Team</p>
+      <h2>Built at <em>IISER Kolkata</em></h2>
+      <p class="lede">A dementia test should be as easy to sit for as a blood pressure check. NeuroHertz starts from one honest number and earns everything else from there.</p>
+    </header>
+    <div class="team">
+      <article class="panel person">
+        <span class="person__avatar" aria-hidden="true">WR</span>
+        <div>
+          <h3>Wordson Robert</h3>
+          <p class="person__role">Founder</p>
+          <p>Built the NeuroHertz pipeline, from raw EEG to the final number.</p>
+        </div>
+      </article>
+      <article class="panel facts">
+        <dl class="kv">
+          <div><dt>Base</dt><dd>IISER Kolkata, India</dd></div>
+          <div><dt>Data</dt><dd>OpenNeuro ds004504 · CC0 · Miltiadous et al., 2023</dd></div>
+          <div><dt>Code</dt><dd><a href="https://github.com/WordsonRobert/neurohertz">github.com/WordsonRobert/neurohertz</a></dd></div>
+        </dl>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ── Contact ────────────────────────────────────────────────────────────── -->
+<section class="chapter contact" id="contact">
+  <div class="wrap">
+    <div class="panel contact__card">
+      <p class="chapter-tag">Run a pilot</p>
+      <h2>Bring NeuroHertz to <em>your clinic or study</em></h2>
+      <p class="lede">Tell us about your cohort, your clinic or your study. We'll bring the headset and the pipeline, and show you every step between the scalp and the number.</p>
+      <div class="cta-row cta-row--center">
+        <a class="btn btn--primary" id="contact-link" href="mailto:hello@neurohertz.example?subject=NeuroHertz%20pilot">Request a pilot <span aria-hidden="true">→</span></a>
+        <a class="btn btn--ghost" href="https://github.com/WordsonRobert/neurohertz">Read the code</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap footer__grid">
+    <div class="footer__brand">
+      <a class="brand" href="#top"><span class="brand__mark" aria-hidden="true"><svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="12.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4.5 16h4l2.2-5.5 3 11 2.6-14 2.6 14 3-11L24.1 16h3.4" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg></span><span class="brand__word">Neuro<b>Hertz</b></span></a>
+      <p>Gamma instability as an EEG biomarker for Alzheimer's disease.</p>
+    </div>
+    <nav aria-label="Pipeline"><p>Pipeline</p><a href="#signal">The signal</a><a href="#clean">Clean</a><a href="#decompose">Decompose</a><a href="#rhythm">Rhythm</a><a href="#biomarker">Biomarker</a></nav>
+    <nav aria-label="Product"><p>Product</p><a href="#headset">Headset</a><a href="#tuning">Tuning</a><a href="#lab">The lab</a><a href="#platform">Platform</a></nav>
+    <nav aria-label="Company"><p>Company</p><a href="#evidence">Evidence</a><a href="#team">Team</a><a href="#contact">Contact</a><a href="https://github.com/WordsonRobert/neurohertz">GitHub</a></nav>
+  </div>
+  <div class="wrap footer__fine">
+    <p>NeuroHertz is a research prototype. It is not a medical device and is not intended to diagnose any condition.</p>
+    <p>EEG data: Miltiadous et al., OpenNeuro ds004504 (CC0). Benchmarks: Miltiadous et al., <i>Data</i> 8(6):95, 2023; Shamsi, 2025.</p>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js" defer></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

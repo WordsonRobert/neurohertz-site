@@ -1,0 +1,11 @@
+{
+  "name": "neurohertz-site",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "NeuroHertz — scroll-driven site for a single-feature EEG biomarker of Alzheimer's disease",
+  "scripts": {
+    "serve": "node tools/serve.mjs",
+    "check:dsp": "node tools/check-dsp.mjs"
+  }
+}
