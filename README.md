@@ -80,7 +80,6 @@ Benchmarks:
 ## Before publishing
 
 - [ ] **Contact address.** `#contact-link` in `index.html` points at the placeholder `hello@neurohertz.example`.
-- [ ] **Team.** Only the repo author is listed. Add co-founders and their roles.
 - [ ] **Headset copy.** Zones, pod, acoustic tubes and the 500 Hz rate follow the wiring design; confirm them against the hardware.
 - [ ] **Validation wording.** The "Next" list names nested validation and full permutation testing. If you re-run with a nested C search and ~1,000 label shuffles, update the numbers and the checks table.
 - [ ] **Social image.** Add an `og:image`.
