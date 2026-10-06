@@ -174,7 +174,7 @@ button { font: inherit; color: inherit; }
 }
 
 .aside { font-size: var(--fs-xs); color: var(--t-mid); line-height: 1.55; }
-.lede { font-size: var(--fs-lg); color: var(--t); max-width: 46rem; line-height: 1.6; }
+.lede { font-size: var(--fs-lg); color: var(--t); max-width: 46rem; line-height: 1.6; text-wrap: pretty; }
 
 .formula {
   display: flex; flex-direction: column; gap: 0.35rem;
@@ -627,10 +627,11 @@ input[type="checkbox"] { accent-color: var(--violet); width: 1rem; height: 1rem;
 /* 13 team + contact */
 .team { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gap); }
 .team__facts { margin-top: var(--gap); }
-.person { padding: 1.3rem 1.4rem; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1rem; align-items: center; font-size: var(--fs-sm); }
+.person { padding: 1.3rem 1.4rem; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1rem; align-items: start; font-size: var(--fs-sm); }
 .person__avatar { width: 3.4rem; height: 3.4rem; border-radius: 14px; display: grid; place-items: center; font: 600 1.1rem/1 var(--font-display); color: var(--on-accent); background: linear-gradient(135deg, var(--violet), var(--amber)); }
 .person h3 { font-size: var(--fs-lg); }
-.person__role { font: 500 var(--fs-mono)/1.4 var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--violet-hi); margin: 0.35rem 0 0; }
+.person__role { font: 500 var(--fs-mono)/1.4 var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--violet-hi); margin: 0.35rem 0 0.55rem; }
+.person__scope { font-size: var(--fs-xs); color: var(--t-mid); line-height: 1.55; }
 .facts { padding: 1.5rem; }
 .facts dd { text-align: right; }
 .contact { padding-top: 0; }
